@@ -1,0 +1,373 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ITEMS 15
+#define QUEUE_SIZE 10
+#define STACK_SIZE 100
+#define MAX_QTY 50
+
+
+struct Food {
+    char name[25];
+    int price;
+    int minutes;
+};
+
+
+struct Order {
+    char customer[50];
+    int token;
+    int quantity[ITEMS];
+};
+
+struct Food menu[ITEMS] = {
+    {"Soft Drink Bottle", 20, 2},
+    {"Soft Drink Can", 40, 2},
+    {"Sandwich", 50, 5},
+    {"Fries", 60, 7},
+    {"Veg Roll", 50, 8},
+    {"Egg Roll", 75, 10},
+    {"Chicken Roll", 90, 12},
+    {"Egg Puff", 35, 2},
+    {"Chicken Puff", 60, 2},
+    {"Veg Puff", 30, 3},
+    {"Veg Burger", 70, 6},
+    {"Veg Fried Rice", 80, 8},
+    {"Veg Noodles", 90, 10},
+    {"Chicken Fried Rice", 120, 12},
+    {"Chicken Hakka Noodles", 125, 15}
+};
+
+
+struct Order queue[QUEUE_SIZE];
+int front = 0;      /* position of the oldest order  */
+int rear = 0;       /* next free position            */
+int count = 0;      /* orders currently in the queue */
+
+
+int changedItem[STACK_SIZE];   /* which item was changed        */
+int oldQuantity[STACK_SIZE];   /* its quantity before the change */
+int top = -1;                  /* -1 means the stack is empty    */
+
+
+struct Order draft;     /* order being prepared, not confirmed yet */
+int hasDraft = 0;       /* 1 if a draft exists                      */
+int nextToken = 101;
+int servedOrders = 0;
+int sales = 0;
+
+
+
+void clearBuffer()
+{
+    int ch;
+    while ((ch = getchar()) != '\n' && ch != EOF) {
+    }
+}
+
+
+{
+    int number, result;
+
+    while (1) {
+        printf("%s", message);
+        result = scanf("%d", &number);
+        if (result == EOF) {
+            printf("\nInput closed. Exiting.\n");
+            exit(0);
+        }
+        clearBuffer();
+        if (result == 1 && number >= min && number <= max) {
+            return number;
+        }
+        printf("Enter a whole number from %d to %d.\n", min, max);
+    }
+}
+
+/* ---------- Stack operations ---------- */
+void push(int item, int oldQty)
+{
+    top++;
+    changedItem[top] = item;
+    oldQuantity[top] = oldQty;
+}
+
+void pop()
+{
+    int item = changedItem[top];
+    draft.quantity[item] = oldQuantity[top];
+    top--;
+    printf("Undo done: %s is back to quantity %d.\n",
+           menu[item].name, draft.quantity[item]);
+}
+
+/* ---------- Helper functions ---------- */
+int findTotal(struct Order o)
+{
+    int i, total = 0;
+    for (i = 0; i < ITEMS; i++) {
+        total = total + o.quantity[i] * menu[i].price;
+    }
+    return total;
+}
+
+int findTime(struct Order o)
+{
+    int i, minutes = 0;
+    for (i = 0; i < ITEMS; i++) {
+        minutes = minutes + o.quantity[i] * menu[i].minutes;
+    }
+    return minutes;
+}
+
+void printBill(struct Order o)
+{
+    int i;
+    printf("\nCustomer: %s\n", o.customer);
+    if (o.token == 0) {
+        printf("Status: DRAFT\n");
+    } else {
+        printf("Token: %d\n", o.token);
+    }
+    for (i = 0; i < ITEMS; i++) {
+        if (o.quantity[i] > 0) {
+            printf("%-22s x %-3d = Rs.%d\n", menu[i].name,
+                   o.quantity[i], o.quantity[i] * menu[i].price);
+        }
+    }
+    printf("Total: Rs.%d\n", findTotal(o));
+}
+
+/* ---------- Menu options ---------- */
+void showMenu()
+{
+    int i;
+    printf("\n%-4s %-22s %-10s %s\n", "ID", "Food", "Price(Rs)", "Minutes");
+    for (i = 0; i < ITEMS; i++) {
+        printf("%-4d %-22s %-10d %d\n", i + 1, menu[i].name,
+               menu[i].price, menu[i].minutes);
+    }
+}
+
+void startDraft()
+{
+    int i;
+
+    if (hasDraft == 1) {
+        printf("Confirm or discard your current draft first.\n");
+        return;
+    }
+    printf("Customer name: ");
+    scanf(" %49[^\n]", draft.customer);
+    clearBuffer();
+
+    for (i = 0; i < ITEMS; i++) {
+        draft.quantity[i] = 0;
+    }
+    draft.token = 0;
+    top = -1;           
+    hasDraft = 1;
+    printf("Draft created.\n");
+}
+
+void changeItem()
+{
+    int item, quantity;
+
+    if (hasDraft == 0) {
+        printf("Start a draft first.\n");
+        return;
+    }
+    showMenu();
+    item = getNumber("Item ID: ", 1, ITEMS) - 1;
+    printf("Current quantity: %d\n", draft.quantity[item]);
+    quantity = getNumber("New total quantity (0 removes item): ", 0, MAX_QTY);
+
+    if (quantity == draft.quantity[item]) {
+        printf("No change made.\n");
+        return;
+    }
+    if (top == STACK_SIZE - 1) {
+        printf("Undo stack is full. Confirm or discard the draft.\n");
+        return;
+    }
+    push(item, draft.quantity[item]); 
+    draft.quantity[item] = quantity;
+    printf("Quantity updated.\n");
+}
+
+void undo()
+{
+    if (hasDraft == 0) {
+        printf("Start a draft first.\n");
+        return;
+    }
+    if (top == -1) {
+        printf("Nothing to undo.\n");
+        return;
+    }
+    pop();
+}
+
+void viewDraft()
+{
+    if (hasDraft == 0) {
+        printf("No active draft.\n");
+    } else {
+        printBill(draft);
+    }
+}
+
+void confirmOrder()
+{
+    if (hasDraft == 0) {
+        printf("No active draft.\n");
+        return;
+    }
+    if (findTotal(draft) == 0) {
+        printf("Cannot confirm an empty order.\n");
+        return;
+    }
+    if (count == QUEUE_SIZE) {
+        printf("Queue is full. Serve an order and try again.\n");
+        return;
+    }
+    draft.token = nextToken;
+    nextToken++;
+
+    queue[rear] = draft;
+    rear = (rear + 1) % QUEUE_SIZE;
+    count++;
+
+    printf("Order confirmed. Token: %d\n", draft.token);
+    printBill(draft);
+    hasDraft = 0;
+    top = -1;
+}
+
+void showQueue()
+{
+    int i, position;
+
+    if (count == 0) {
+        printf("No pending orders.\n");
+        return;
+    }
+    printf("\nPending orders: %d/%d\n", count, QUEUE_SIZE);
+    printf("FRONT -> ");
+    for (i = 0; i < count; i++) {
+        position = (front + i) % QUEUE_SIZE;
+        printf("[%d] ", queue[position].token);
+    }
+    printf("<- REAR\n");
+
+    for (i = 0; i < count; i++) {
+        position = (front + i) % QUEUE_SIZE;
+        printBill(queue[position]);
+    }
+}
+
+void trackOrder()
+{
+    int token, i, position;
+    int waiting = 0;   
+
+    token = getNumber("Token to find: ", 1, 100000);
+    for (i = 0; i < count; i++) {
+        position = (front + i) % QUEUE_SIZE;
+        if (queue[position].token == token) {
+            printBill(queue[position]);
+            printf("Orders ahead: %d\n", i);
+            printf("Estimated start: %d minutes\n", waiting);
+            printf("Estimated ready: %d minutes\n",
+                   waiting + findTime(queue[position]));
+            return;
+        }
+        waiting = waiting + findTime(queue[position]);
+    }
+    printf("Token not found (wrong token or already served).\n");
+}
+
+void serveOrder()
+{
+    if (count == 0) {
+        printf("Queue is empty. Nothing to serve.\n");
+        return;
+    }
+    printf("Serving token %d.\n", queue[front].token);
+    printBill(queue[front]);
+
+    sales = sales + findTotal(queue[front]);
+    servedOrders++;
+
+    front = (front + 1) % QUEUE_SIZE;
+    count--;
+}
+
+void showSales()
+{
+    int i, position;
+    int pending = 0;
+
+    for (i = 0; i < count; i++) {
+        position = (front + i) % QUEUE_SIZE;
+        pending = pending + findTotal(queue[position]);
+    }
+    printf("\nOrders served: %d\n", servedOrders);
+    printf("Sales from served orders: Rs.%d\n", sales);
+    printf("Value of pending orders: Rs.%d\n", pending);
+}
+
+void discardDraft()
+{
+    if (hasDraft == 0) {
+        printf("No active draft.\n");
+        return;
+    }
+    if (getNumber("Discard draft? (1=yes, 0=no): ", 0, 1) == 1) {
+        hasDraft = 0;
+        top = -1;
+        printf("Draft discarded.\n");
+    }
+}
+
+int main()
+{
+    int choice;
+
+    printf("COLLEGE CAFETERIA ORDER MANAGEMENT\n");
+    printf("Queue = pending orders, Stack = undo for the current draft\n");
+
+    while (1) {
+        printf("\n1. Display menu\n");
+        printf("2. Start new order (draft)\n");
+        printf("3. Set item quantity\n");
+        printf("4. Undo last change\n");
+        printf("5. View draft\n");
+        printf("6. Confirm order\n");
+        printf("7. Show pending queue\n");
+        printf("8. Track token\n");
+        printf("9. Serve next order\n");
+        printf("10. Sales summary\n");
+        printf("11. Discard draft\n");
+        printf("0. Exit\n");
+        choice = getNumber("Choose: ", 0, 11);
+
+        if (choice == 1) showMenu();
+        else if (choice == 2) startDraft();
+        else if (choice == 3) changeItem();
+        else if (choice == 4) undo();
+        else if (choice == 5) viewDraft();
+        else if (choice == 6) confirmOrder();
+        else if (choice == 7) showQueue();
+        else if (choice == 8) trackOrder();
+        else if (choice == 9) serveOrder();
+        else if (choice == 10) showSales();
+        else if (choice == 11) discardDraft();
+        else {
+            printf("Goodbye. Data is not saved.\n");
+            return 0;
+        }
+    }
+}

@@ -41,8 +41,8 @@ struct Food menu[ITEMS] = {
 
 
 struct Order queue[QUEUE_SIZE];
-int front = 0; 
-int rear = 0;  
+int front = 0;      
+int rear = 0;       
 int count = 0;      
 
 
@@ -52,7 +52,7 @@ int top = -1;
 
 
 struct Order draft;     
-int hasDraft = 0;       
+int hasDraft = 0;                           
 int nextToken = 101;
 int servedOrders = 0;
 int sales = 0;
@@ -67,6 +67,7 @@ void clearBuffer()
 }
 
 
+int getNumber(char message[], int min, int max)
 {
     int number, result;
 
@@ -101,7 +102,6 @@ void pop()
     printf("Undo done: %s is back to quantity %d.\n",
            menu[item].name, draft.quantity[item]);
 }
-
 
 int findTotal(struct Order o)
 {
@@ -235,8 +235,7 @@ void confirmOrder()
     }
     draft.token = nextToken;
     nextToken++;
-
-    queue[rear] = draft;
+  queue[rear] = draft;
     rear = (rear + 1) % QUEUE_SIZE;
     count++;
 
@@ -271,7 +270,7 @@ void showQueue()
 void trackOrder()
 {
     int token, i, position;
-    int waiting = 0;   
+    int waiting = 0;    
 
     token = getNumber("Token to find: ", 1, 100000);
     for (i = 0; i < count; i++) {
@@ -301,6 +300,7 @@ void serveOrder()
     sales = sales + findTotal(queue[front]);
     servedOrders++;
 
+    /* DEQUEUE: just move front forward (wraps around) */
     front = (front + 1) % QUEUE_SIZE;
     count--;
 }
